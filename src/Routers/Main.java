@@ -2,6 +2,8 @@ package Routers;
 
 import Messages.*;
 import worker.*;
+
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Scanner;
@@ -33,7 +35,7 @@ public class Main {
             int target, min, max; String text; long time;
             switch (instruction) {
                 case "send":
-                    //指定端口，直接单次发送
+                    //指定接收端口，会对所有范围内的路由器广播
                     //send 8081 abc 5000
                     target = scan.nextInt();
                     text = scan.next();
@@ -51,23 +53,6 @@ public class Main {
                     max = scan.nextInt();
                     sendRandom(target, text, time, min, max);
                     break;
-                case "radio":
-                    //广播一次消息
-                    //radio abc 5000
-                    text = scan.next();
-                    time = scan.nextLong();
-                    radio(text, time);
-                    inputInstruction = true;
-                    break;
-                case "radioRandom":
-                    //间隔一定随机时间广播消息
-                    //radioRandom abc 5000
-                    text = scan.next();
-                    time = scan.nextLong();
-                    min = scan.nextInt();
-                    max = scan.nextInt();
-                    radioRandom(text, time, min, max);
-                    break;
                 case "state":
                     //打印当前路由器的信息
                     localRouter.printState();
@@ -82,47 +67,27 @@ public class Main {
     }
 
     /***
-     * 向范围内的所有路由广播
-     */
-    public static void radio(String text, long busyTimeMillis) {
-        try {
-            for (Router router : Main.routers) {
-                if (Math.abs(router.location - Main.localRouter.location) > Main.localRouter.range) {
-                    continue;   //如果所选的路由器在广播范围外，则不对他发送
-                }
-                sendNormal(router.port, text, busyTimeMillis);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-    /***
-     * 向范围内的所有路由随机时间广播
-     */
-    public static void radioRandom(String text, long busyTimeMillis, int min, int max) {
-        try {
-            for (Router router : Main.routers) {
-                if (Math.abs(router.location - Main.localRouter.location) > Main.localRouter.range) {
-                    continue;   //如果所选的路由器在广播范围外，则不对他发送
-                }
-                sendRandom(router.port, text, busyTimeMillis, min, max);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    /***
-     * 单次指定端口发送
+     * 广播发送，但是只有指定的端口会处理信息，其他的会更新信道繁忙时间
      * @param target    目标端口
      * @param text    发送文本
      * @param busyTimeMillis    占用信道持续时间
      * @return    是否发送成功
      */
     public static boolean sendNormal(int target, String text, long busyTimeMillis) {
-        //TODO: 发送前检查一下自己是否繁忙，如果繁忙的话则不发送
-        //sendOnce 的返回值用于记录本次发送是否成功
-        return clint.send(new NormalMsg(Main.localRouter.port, target, MsgType.NORMAL, text, busyTimeMillis), target);
+        SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss");
+        if (Main.localRouter.isBusy()) {
+            String nowTime = sdf.format(new Date());
+            System.out.println(nowTime + " | [" + Main.localRouter.port + "] 信道正忙，不发送消息");
+            return false;
+        } else {
+            for (Router router : Main.routers) {
+                if (Math.abs(router.location - Main.localRouter.location) > Main.localRouter.range) {
+                    continue;   //如果所选的路由器在广播范围外，则不对他发送
+                }
+                clint.send(new NormalMsg(Main.localRouter.port, target, MsgType.NORMAL, text, busyTimeMillis), router.port);
+            }
+            return true;
+        }
     }
 
     public static void sendRandom(int target, String text, long busyTimeMillis, int min, int max) {

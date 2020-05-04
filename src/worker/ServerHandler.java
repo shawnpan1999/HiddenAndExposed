@@ -32,28 +32,34 @@ public class ServerHandler implements Runnable {
                         break;
                     case SILENT:
                         //静默消息本地显示即可
-                        System.out.println(nowTime + " | [" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息.");
+                        if (getMsg.toPort == Main.localRouter.port) {
+                            System.out.println(nowTime + " | [" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息.");
+                        }
                         break;
                     case NORMAL:
                         //普通消息要本地显示，作出回应，设置信道繁忙时间
-                        System.out.println(nowTime + " | [" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息.");
                         if (getMsg.toPort == Main.localRouter.port) {
                             //是发给我的消息，就要检查隐蔽站问题
+                            System.out.println(nowTime + " | [" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息.");
                             if (Main.localRouter.isBusy()) {
                                 //如果当前信道忙，则发生隐蔽站问题，且中断连接
                                 System.out.println(nowTime + " | [" + Main.localRouter.port + "] 当前信道正忙！ ");
                                 System.out.println("【发生隐蔽站问题】");
+                                //回应ERROR
+                                String echoWord = "ERROR";
+                                dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));    //toString 后写到输出流
                                 quitFlag = true;
                             } else {
-                                //信道不忙则正常回应消息
-                                String echoWord = "get message successfully. Type = " + getMsg.type;
-                                Message echoMsg = new SilentMsg(Main.localRouter.port, socket.getPort(), MsgType.SILENT, echoWord);  //回应的消息使用静默消息即可
                                 Main.localRouter.setLastBusyDate(((NormalMsg)getMsg).lastBusyDate);    //更新繁忙时间
-                                dataOutputStream.writeBytes(echoMsg.toString() + System.getProperty("line.separator"));    //toString 后写到输出流
+                                //信道不忙则回应ACK
+                                String echoWord = "ACK";
+                                dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));    //toString 后写到输出流
                             }
                         } else {
-                            //不是发给我的消息，只要更新一下当前信道的繁忙时间
                             Main.localRouter.setLastBusyDate(((NormalMsg)getMsg).lastBusyDate);    //更新繁忙时间
+                            //不是发给我的消息，回应QUIT
+                            String echoWord = "QUIT";
+                            dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));    //toString 后写到输出流
                         }
                         break;
                     case QUIT:

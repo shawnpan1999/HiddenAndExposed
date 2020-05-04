@@ -53,13 +53,17 @@ public class Clint {
 
             //接收回应
             String echoWord = bufferedReader.readLine();
-            if (echoWord == null) {
-                String nowTime = sdf.format(new Date());
-                System.out.println(nowTime + " | [" + Main.localRouter.port + "] 通道关闭");
-                return false;
-            } else {
-                QuitMsg quitMsg = new QuitMsg(Main.localRouter.port, socket.getPort(), MsgType.QUIT, "quit");
-                dataOutputStream.writeBytes(quitMsg.toString());
+            switch (echoWord) {
+                case "ACK":
+                case "QUIT":
+                    QuitMsg quitMsg = new QuitMsg(Main.localRouter.port, socket.getPort(), MsgType.QUIT, "quit");
+                    dataOutputStream.writeBytes(quitMsg.toString());
+                    break;
+                case "ERROR":
+                    String nowTime = sdf.format(new Date());
+                    System.out.println(nowTime + " | [" + Main.localRouter.port + "] ERROR 通道关闭");
+                    this.close();
+                    return false;
             }
             this.close();
         } catch (Exception e) {
