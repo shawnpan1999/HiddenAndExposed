@@ -5,9 +5,12 @@ import Routers.*;
 
 import java.io.*;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class ServerHandler implements Runnable {
-    Socket socket;
+    private Socket socket;
+    private SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss");
 
     public ServerHandler(Socket socket) {
         this.socket = socket;
@@ -20,25 +23,25 @@ public class ServerHandler implements Runnable {
 
             boolean quitFlag = false;
             while (!quitFlag) {
+                String nowTime = sdf.format(new Date());
                 String getWord = bufferedReader.readLine();
                 Message getMsg = Message.parse(getWord);    //从得到的 getWord 中解析出 Message
-                //TODO: 根据收到各种不同类型的 Message 做相应的动作
                 switch(getMsg.type) {
                     case PROBE:
                         //TODO: 探查消息的返回
                         break;
                     case SILENT:
                         //静默消息本地显示即可
-                        System.out.println("[" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息:" + getWord);
+                        System.out.println(nowTime + " | [" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息.");
                         break;
                     case NORMAL:
                         //普通消息要本地显示，作出回应，设置信道繁忙时间
-                        System.out.println("[" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息:" + getWord);
+                        System.out.println(nowTime + " | [" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息.");
                         if (getMsg.toPort == Main.localRouter.port) {
                             //是发给我的消息，就要检查隐蔽站问题
                             if (Main.localRouter.isBusy()) {
                                 //如果当前信道忙，则发生隐蔽站问题，且中断连接
-                                System.out.println("[" + Main.localRouter.port + "] 当前信道正忙！ ");
+                                System.out.println(nowTime + " | [" + Main.localRouter.port + "] 当前信道正忙！ ");
                                 System.out.println("【发生隐蔽站问题】");
                                 quitFlag = true;
                             } else {

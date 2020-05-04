@@ -10,7 +10,7 @@ public class Server implements Runnable{
 
     public void run() {  //监听端口，接收请求
         try {
-            System.out.println("[" + this.port + "] 服务端口启动");
+            System.out.println("[" + this.port + "] 端口启动");
             System.out.print(">>> ");
             ServerSocket serverSocket = new ServerSocket(port); //其实这里面就做了绑定 bind() 的操作
             while(true) {

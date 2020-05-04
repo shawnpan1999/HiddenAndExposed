@@ -6,11 +6,14 @@ import Routers.*;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class Clint {
-    Socket socket;
-    BufferedReader bufferedReader;  //通道的输入Reader
-    DataOutputStream dataOutputStream;  //通道的Data输出流
+    private Socket socket;
+    private BufferedReader bufferedReader;  //通道的输入Reader
+    private DataOutputStream dataOutputStream;  //通道的Data输出流
+    private SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss");
 
     private void connect(int port) {
         try {
@@ -43,7 +46,7 @@ public class Clint {
      * @param message 指定的 Message 信息
      * @param targetPort 指定端口
      */
-    public boolean sendOnce(Message message, int targetPort) {
+    public boolean send(Message message, int targetPort) {
         try {
             this.connect(targetPort);
             dataOutputStream.writeBytes(message.toString() + System.getProperty("line.separator"));
@@ -51,7 +54,8 @@ public class Clint {
             //接收回应
             String echoWord = bufferedReader.readLine();
             if (echoWord == null) {
-                System.out.println("[" + Main.localRouter.port + "] 通道关闭");
+                String nowTime = sdf.format(new Date());
+                System.out.println(nowTime + " | [" + Main.localRouter.port + "] 通道关闭");
                 return false;
             } else {
                 QuitMsg quitMsg = new QuitMsg(Main.localRouter.port, socket.getPort(), MsgType.QUIT, "quit");
