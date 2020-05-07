@@ -28,7 +28,8 @@ public class ServerHandler implements Runnable {
                 Message getMsg = Message.parse(getWord);    //从得到的 getWord 中解析出 Message
                 switch(getMsg.type) {
                     case PROBE:
-                        //TODO: 探查消息的返回
+                        int state = Main.localRouter.getState();
+                        dataOutputStream.writeBytes(state + System.getProperty("line.separator"));
                         break;
                     case SILENT:
                         //静默消息本地显示即可
@@ -47,19 +48,21 @@ public class ServerHandler implements Runnable {
                                 System.out.println("【发生隐蔽站问题】");
                                 //回应ERROR
                                 String echoWord = "ERROR";
-                                dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));    //toString 后写到输出流
+                                //设置路由器状态
+                                Main.localRouter.state = 2;
+                                dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));
                                 quitFlag = true;
                             } else {
                                 Main.localRouter.setLastBusyDate(((NormalMsg)getMsg).lastBusyDate);    //更新繁忙时间
                                 //信道不忙则回应ACK
                                 String echoWord = "ACK";
-                                dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));    //toString 后写到输出流
+                                dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));
                             }
                         } else {
                             Main.localRouter.setLastBusyDate(((NormalMsg)getMsg).lastBusyDate);    //更新繁忙时间
                             //不是发给我的消息，回应QUIT
                             String echoWord = "QUIT";
-                            dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));    //toString 后写到输出流
+                            dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));
                         }
                         break;
                     case QUIT:
@@ -76,7 +79,7 @@ public class ServerHandler implements Runnable {
             dataOutputStream.close();
             socket.close();
         } catch (Exception e) {
-            e.printStackTrace();
+//            e.printStackTrace();
         }
     }
 }

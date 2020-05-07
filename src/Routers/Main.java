@@ -6,6 +6,7 @@ import worker.*;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.InputMismatchException;
 import java.util.Scanner;
 
 public class Main {
@@ -26,42 +27,45 @@ public class Main {
         }
         configureRouter(args);
         //输入指令
-        boolean inputInstruction = true;
-        while (inputInstruction) {
+        boolean continueInput = true;
+        while (continueInput) {
             System.out.print(">>> ");
-            inputInstruction = false;
             Scanner scan = new Scanner(System.in);
             String instruction = scan.next();
             int target, min, max; String text; long time;
-            switch (instruction) {
-                case "send":
-                    //指定接收端口，会对所有范围内的路由器广播
-                    //send 8081 abc 5000
-                    target = scan.nextInt();
-                    text = scan.next();
-                    time = scan.nextLong();
-                    sendNormal(target, text, time);
-                    inputInstruction = true;
-                    break;
-                case "sendRandom":
-                    //指定端口，间隔随机时间发送一次数据
-                    //sendRandom 8081 abc 5000
-                    target = scan.nextInt();
-                    text = scan.next();
-                    time = scan.nextLong();
-                    min = scan.nextInt();
-                    max = scan.nextInt();
-                    sendRandom(target, text, time, min, max);
-                    break;
-                case "state":
-                    //打印当前路由器的信息
-                    localRouter.printState();
-                    inputInstruction = true;
-                    break;
-                default:
-                    System.out.println("非法的指令，请重新输入！");
-                    inputInstruction = true;
-                    break;
+            try {
+                switch (instruction) {
+                    case "send":
+                        //指定接收端口，会对所有范围内的路由器广播
+                        //send 8081 abc 5000
+                        target = scan.nextInt();
+                        text = scan.next();
+                        time = scan.nextLong();
+                        sendNormal(target, text, time);
+                        break;
+                    case "sendRandom":
+                        //指定端口，间隔随机时间发送一次数据
+                        //sendRandom 8081 abc 2000 2 5
+                        target = scan.nextInt();
+                        text = scan.next();
+                        time = scan.nextLong();
+                        min = scan.nextInt();
+                        max = scan.nextInt();
+                        sendRandom(target, text, time, min, max);
+                        continueInput = false;
+                        break;
+                    case "state":
+                        //打印当前路由器的信息
+                        localRouter.printState();
+                        break;
+                    case "betterSend":
+                        //TODO: 用 cts/rts 帧来减少隐蔽站和暴露站的问题
+                    default:
+                        System.out.println("非法指令，请重新输入！");
+                        break;
+                }
+            } catch (InputMismatchException e) {
+                System.out.println("非法指令，请重新输入！");
             }
         }
     }
@@ -77,7 +81,13 @@ public class Main {
         SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss");
         if (Main.localRouter.isBusy()) {
             String nowTime = sdf.format(new Date());
-            System.out.println(nowTime + " | [" + Main.localRouter.port + "] 信道正忙，不发送消息");
+            System.out.println(nowTime + " | 检测到信道正忙，不发送消息");
+            //检测一下目标真实信道状态
+            String realState = clint.send(new ProbeMsg(Main.localRouter.port, target, MsgType.PROBE, text), target);
+            if (realState.equals("0")) {
+                System.out.println(nowTime + " | " + target + " 实际上并没有繁忙，发生隐蔽站问题");
+                Main.localRouter.state = 3;
+            }
             return false;
         } else {
             for (Router router : Main.routers) {

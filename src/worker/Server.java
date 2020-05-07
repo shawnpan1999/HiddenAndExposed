@@ -11,7 +11,6 @@ public class Server implements Runnable{
     public void run() {  //监听端口，接收请求
         try {
             System.out.println("[" + this.port + "] 端口启动");
-            System.out.print(">>> ");
             ServerSocket serverSocket = new ServerSocket(port); //其实这里面就做了绑定 bind() 的操作
             while(true) {
                 //在死循环内不断接受请求，每次接收到一个连接请求就新建一个socket，并开一条线程去处理

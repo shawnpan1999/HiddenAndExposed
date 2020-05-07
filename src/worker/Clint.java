@@ -46,7 +46,7 @@ public class Clint {
      * @param message 指定的 Message 信息
      * @param targetPort 指定端口
      */
-    public boolean send(Message message, int targetPort) {
+    public String send(Message message, int targetPort) {
         try {
             this.connect(targetPort);
             dataOutputStream.writeBytes(message.toString() + System.getProperty("line.separator"));
@@ -60,15 +60,12 @@ public class Clint {
                     dataOutputStream.writeBytes(quitMsg.toString());
                     break;
                 case "ERROR":
-                    String nowTime = sdf.format(new Date());
-                    System.out.println(nowTime + " | [" + Main.localRouter.port + "] ERROR 通道关闭");
-                    this.close();
-                    return false;
             }
             this.close();
+            return echoWord;
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return true;
+        return null;
     }
 }
