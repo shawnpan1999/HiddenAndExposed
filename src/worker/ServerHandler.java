@@ -1,7 +1,7 @@
 package worker;
 
 import Messages.*;
-import Routers.*;
+import Stations.*;
 
 import java.io.*;
 import java.net.Socket;
@@ -28,38 +28,38 @@ public class ServerHandler implements Runnable {
                 Message getMsg = Message.parse(getWord);    //从得到的 getWord 中解析出 Message
                 switch(getMsg.type) {
                     case PROBE:
-                        int state = Main.localRouter.getState();
+                        int state = Main.localStation.getState();
                         dataOutputStream.writeBytes(state + System.getProperty("line.separator"));
                         break;
                     case SILENT:
                         //静默消息本地显示即可
-                        if (getMsg.toPort == Main.localRouter.port) {
-                            System.out.println(nowTime + " | [" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息.");
+                        if (getMsg.toPort == Main.localStation.port) {
+                            System.out.println(nowTime + " | [" + Main.localStation.port + "] 收到来自 " + getMsg.fromPort + " 的信息.");
                         }
                         break;
                     case NORMAL:
                         //普通消息要本地显示，作出回应，设置信道繁忙时间
-                        if (getMsg.toPort == Main.localRouter.port) {
+                        if (getMsg.toPort == Main.localStation.port) {
                             //是发给我的消息，就要检查隐蔽站问题
-                            System.out.println(nowTime + " | [" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息: " + getMsg.text);
-                            if (Main.localRouter.isBusy()) {
+                            System.out.println(nowTime + " | [" + Main.localStation.port + "] 收到来自 " + getMsg.fromPort + " 的信息: " + getMsg.text);
+                            if (Main.localStation.isBusy()) {
                                 //如果当前信道忙，则发生隐蔽站问题，且中断连接
-                                System.out.println(nowTime + " | [" + Main.localRouter.port + "] 当前信道正忙！ ");
+                                System.out.println(nowTime + " | [" + Main.localStation.port + "] 当前信道正忙！ ");
                                 System.out.println("【发生隐蔽站问题】");
                                 //回应ERROR
                                 String echoWord = "ERROR";
                                 //设置路由器状态
-                                Main.localRouter.state = 2;
+                                Main.localStation.state = 2;
                                 dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));
                                 quitFlag = true;
                             } else {
-                                Main.localRouter.setLastBusyDate(((NormalMsg)getMsg).lastBusyDate);    //更新繁忙时间
+                                Main.localStation.setLastBusyDate(((NormalMsg)getMsg).lastBusyDate);    //更新繁忙时间
                                 //信道不忙则回应ACK
                                 String echoWord = "ACK";
                                 dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));
                             }
                         } else {
-                            Main.localRouter.setLastBusyDate(((NormalMsg)getMsg).lastBusyDate);    //更新繁忙时间
+                            Main.localStation.setLastBusyDate(((NormalMsg)getMsg).lastBusyDate);    //更新繁忙时间
                             //不是发给我的消息，回应QUIT
                             String echoWord = "QUIT";
                             dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));
@@ -67,7 +67,7 @@ public class ServerHandler implements Runnable {
                         break;
                     case RTS:
                         //收到RTS，则预约信道：信道繁忙则不回复，不繁忙则回复CTS
-                        if (Main.localRouter.isBusy()) {
+                        if (Main.localStation.isBusy()) {
                             //TODO: 应该在信道忙的时候回复？
                         } else {
                             String echoWord = "CTS";

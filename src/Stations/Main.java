@@ -1,7 +1,6 @@
-package Routers;
+package Stations;
 
 import Messages.*;
-import com.sun.org.apache.bcel.internal.generic.BREAKPOINT;
 import worker.*;
 
 import java.text.SimpleDateFormat;
@@ -19,8 +18,8 @@ public class Main {
     public static boolean RTS_OPEN = false;    //RTS功能是否开启
     public static boolean RANDOM_OPEN = false;    //是否允许随机发送状态
 
-    public static Router localRouter;
-    public static ArrayList<Router> routers = new ArrayList<>();  //其他路由器的信息表
+    public static Station localStation;
+    public static ArrayList<Station> stations = new ArrayList<>();  //其他路由器的信息表
     public static Server server;
     public static Clint clint;
 
@@ -70,14 +69,14 @@ public class Main {
                         }).start();
                         break;
                     case "stop":
-                        if (localRouter.state >= 2) {
-                            localRouter.state = 0;
+                        if (localStation.state >= 2) {
+                            localStation.state = 0;
                         }
                         RANDOM_OPEN = false;
                         break;
                     case "state":
                         //打印当前路由器的信息
-                        localRouter.printState();
+                        localStation.printState();
                         break;
                     case "RTS":
                         if (RTS_OPEN) {
@@ -107,22 +106,22 @@ public class Main {
      */
     public static boolean sendNormal(int target, String text, long busyTimeMillis) {
         SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss");
-        if (Main.localRouter.isBusy()) {
+        if (Main.localStation.isBusy()) {
             String nowTime = sdf.format(new Date());
             System.out.println(nowTime + " | 信道正忙，不发送消息");
             //检测一下目标真实信道状态
-            String realState = clint.send(new ProbeMsg(Main.localRouter.port, target, MsgType.PROBE, text), target);
+            String realState = clint.send(new ProbeMsg(Main.localStation.port, target, MsgType.PROBE, text), target);
             if (realState.equals("0")) {
                 System.out.println(nowTime + " | " + target + " 实际上并没有繁忙，发生暴露站问题");
-                Main.localRouter.state = 3;
+                Main.localStation.state = 3;
             }
             return false;
         } else {
-            for (Router router : Main.routers) {
-                if (Math.abs(router.location - Main.localRouter.location) > Main.localRouter.range) {
+            for (Station station : Main.stations) {
+                if (Math.abs(station.location - Main.localStation.location) > Main.localStation.range) {
                     continue;   //如果所选的路由器在广播范围外，则不对他发送
                 }
-                clint.send(new NormalMsg(Main.localRouter.port, target, MsgType.NORMAL, text, busyTimeMillis), router.port);
+                clint.send(new NormalMsg(Main.localStation.port, target, MsgType.NORMAL, text, busyTimeMillis), station.port);
             }
             return true;
         }
@@ -138,13 +137,13 @@ public class Main {
     public static boolean sendWithRTS(int target, String text, long busyTimeMillis) {
         int timeout = 500;
         SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss");
-        RTSMsg rtsMsg = new RTSMsg(Main.localRouter.port, target, MsgType.RTS, text, timeout);
+        RTSMsg rtsMsg = new RTSMsg(Main.localStation.port, target, MsgType.RTS, text, timeout);
         Future<String> echoFuture = sendRTS(rtsMsg, target);
         try {
             String echoWord = echoFuture.get(timeout, TimeUnit.MILLISECONDS);   //在规定时间内接收消息
             if (echoWord.equals("CTS")) {
                 //如果收到回复 CTS ，则发送接下来的信息
-                NormalMsg normalMsg = new NormalMsg(Main.localRouter.port, target, MsgType.NORMAL, text, busyTimeMillis);
+                NormalMsg normalMsg = new NormalMsg(Main.localStation.port, target, MsgType.NORMAL, text, busyTimeMillis);
                 clint.send(normalMsg, target);
                 return true;
             } else {
@@ -153,7 +152,7 @@ public class Main {
         } catch(Exception e) {
             //超出时间，表明信道预约失败
             String nowTime = sdf.format(new Date());
-            System.out.println(nowTime + " | [" + Main.localRouter.port + "] RTS预约失败：服务端无回复");
+            System.out.println(nowTime + " | [" + Main.localStation.port + "] RTS预约失败：服务端无回复");
             clint.close();
             return false;
         }
@@ -162,7 +161,7 @@ public class Main {
     public static void sendWithRTSRandom(int target, String text, long busyTimeMillis, int min, int max) {
         int timeout = 500;
         SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss");
-        RTSMsg rtsMsg = new RTSMsg(Main.localRouter.port, target, MsgType.RTS, text, timeout);
+        RTSMsg rtsMsg = new RTSMsg(Main.localStation.port, target, MsgType.RTS, text, timeout);
         while (RANDOM_OPEN) {
             double random = Math.random() * (max - min) + min;  //min~max秒的随机发送间隔
             try {
@@ -176,7 +175,7 @@ public class Main {
                 String echoWord = echoFuture.get(timeout, TimeUnit.MILLISECONDS);   //在规定时间内接收消息
                 if (echoWord.equals("CTS")) {
                     //如果收到回复 CTS ，则发送接下来的信息
-                    NormalMsg normalMsg = new NormalMsg(Main.localRouter.port, target, MsgType.NORMAL, text, busyTimeMillis);
+                    NormalMsg normalMsg = new NormalMsg(Main.localStation.port, target, MsgType.NORMAL, text, busyTimeMillis);
                     clint.send(normalMsg, target);
                 } else {
                     continue;
@@ -184,7 +183,7 @@ public class Main {
             } catch(Exception e) {
                 //超出时间，表明信道预约失败
                 String nowTime = sdf.format(new Date());
-                System.out.println(nowTime + " | [" + Main.localRouter.port + "] RTS预约失败：服务端无回复");
+                System.out.println(nowTime + " | [" + Main.localStation.port + "] RTS预约失败：服务端无回复");
                 clint.close();  //手动关闭一下clint
                 continue;
             }
@@ -213,33 +212,33 @@ public class Main {
     }
 
     public static void configureRouter(String[] args) {
-        Router a = new Router(DEFAULT_PORT[0], DEFAULT_LOC[0], DEFAULT_DATE[0], DEFAULT_RANGE[0]);
-        Router b = new Router(DEFAULT_PORT[1], DEFAULT_LOC[1], DEFAULT_DATE[1], DEFAULT_RANGE[1]);
-        Router c = new Router(DEFAULT_PORT[2], DEFAULT_LOC[2], DEFAULT_DATE[2], DEFAULT_RANGE[2]);
-        Router d = new Router(DEFAULT_PORT[3], DEFAULT_LOC[3], DEFAULT_DATE[3], DEFAULT_RANGE[3]);
-        Main.routers.add(a); Main.routers.add(b);
-        Main.routers.add(c); Main.routers.add(d);
+        Station a = new Station(DEFAULT_PORT[0], DEFAULT_LOC[0], DEFAULT_DATE[0], DEFAULT_RANGE[0]);
+        Station b = new Station(DEFAULT_PORT[1], DEFAULT_LOC[1], DEFAULT_DATE[1], DEFAULT_RANGE[1]);
+        Station c = new Station(DEFAULT_PORT[2], DEFAULT_LOC[2], DEFAULT_DATE[2], DEFAULT_RANGE[2]);
+        Station d = new Station(DEFAULT_PORT[3], DEFAULT_LOC[3], DEFAULT_DATE[3], DEFAULT_RANGE[3]);
+        Main.stations.add(a); Main.stations.add(b);
+        Main.stations.add(c); Main.stations.add(d);
         switch (args[0]) {
             case "A":
-                Main.localRouter = a;
-                Main.routers.remove(0);
+                Main.localStation = a;
+                Main.stations.remove(0);
                 break;
             case "B":
-                Main.localRouter = b;
-                Main.routers.remove(1);
+                Main.localStation = b;
+                Main.stations.remove(1);
                 break;
             case "C":
-                Main.localRouter = c;
-                Main.routers.remove(2);
+                Main.localStation = c;
+                Main.stations.remove(2);
                 break;
             case "D":
-                Main.localRouter = d;
-                Main.routers.remove(3);
+                Main.localStation = d;
+                Main.stations.remove(3);
                 break;
             default:
                 break;
         }
-        Main.server = new Server(Main.localRouter.port);
+        Main.server = new Server(Main.localStation.port);
         new Thread(server).start();    //服务线程开启
         Main.clint = new Clint();
     }

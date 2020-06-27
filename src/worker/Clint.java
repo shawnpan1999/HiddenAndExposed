@@ -1,13 +1,12 @@
 package worker;
 
 import Messages.*;
-import Routers.*;
+import Stations.*;
 
 import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
-import java.util.Date;
 
 public class Clint {
     private Socket socket;
@@ -58,7 +57,7 @@ public class Clint {
                 case "ACK":
                 case "CTS":
                 case "QUIT":
-                    QuitMsg quitMsg = new QuitMsg(Main.localRouter.port, socket.getPort(), MsgType.QUIT, "quit");
+                    QuitMsg quitMsg = new QuitMsg(Main.localStation.port, socket.getPort(), MsgType.QUIT, "quit");
                     dataOutputStream.writeBytes(quitMsg.toString());
                     break;
                 case "ERROR":
