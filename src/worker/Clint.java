@@ -31,7 +31,7 @@ public class Clint {
         }
     }
 
-    private void close() {
+    public void close() {
         try {
             dataOutputStream.close();
             bufferedReader.close();
@@ -42,9 +42,10 @@ public class Clint {
     }
 
     /***
-     * 直接向一个端口发送指定 Message，只发一次，发完就退出 QUIT
+     * 直接向一个端口发送指定 Message
      * @param message 指定的 Message 信息
      * @param targetPort 指定端口
+     * @return 服务器返回的信息
      */
     public String send(Message message, int targetPort) {
         try {
@@ -55,6 +56,7 @@ public class Clint {
             String echoWord = bufferedReader.readLine();
             switch (echoWord) {
                 case "ACK":
+                case "CTS":
                 case "QUIT":
                     QuitMsg quitMsg = new QuitMsg(Main.localRouter.port, socket.getPort(), MsgType.QUIT, "quit");
                     dataOutputStream.writeBytes(quitMsg.toString());
@@ -64,7 +66,7 @@ public class Clint {
             this.close();
             return echoWord;
         } catch (Exception e) {
-            e.printStackTrace();
+//            e.printStackTrace();
         }
         return null;
     }

@@ -53,6 +53,9 @@ public abstract class Message {
                     e.printStackTrace();
                 }
                 break;
+            case "RTS":
+                msg = new RTSMsg(fromPort, toPort, type, text,Integer.parseInt(fields[4]));
+                break;
             case "QUIT":
                 msg = new QuitMsg(fromPort, toPort, type, text);
                 break;

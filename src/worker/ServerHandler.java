@@ -41,7 +41,7 @@ public class ServerHandler implements Runnable {
                         //普通消息要本地显示，作出回应，设置信道繁忙时间
                         if (getMsg.toPort == Main.localRouter.port) {
                             //是发给我的消息，就要检查隐蔽站问题
-                            System.out.println(nowTime + " | [" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息.");
+                            System.out.println(nowTime + " | [" + Main.localRouter.port + "] 收到来自 " + getMsg.fromPort + " 的信息: " + getMsg.text);
                             if (Main.localRouter.isBusy()) {
                                 //如果当前信道忙，则发生隐蔽站问题，且中断连接
                                 System.out.println(nowTime + " | [" + Main.localRouter.port + "] 当前信道正忙！ ");
@@ -62,6 +62,15 @@ public class ServerHandler implements Runnable {
                             Main.localRouter.setLastBusyDate(((NormalMsg)getMsg).lastBusyDate);    //更新繁忙时间
                             //不是发给我的消息，回应QUIT
                             String echoWord = "QUIT";
+                            dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));
+                        }
+                        break;
+                    case RTS:
+                        //收到RTS，则预约信道：信道繁忙则不回复，不繁忙则回复CTS
+                        if (Main.localRouter.isBusy()) {
+                            //TODO: 应该在信道忙的时候回复？
+                        } else {
+                            String echoWord = "CTS";
                             dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));
                         }
                         break;

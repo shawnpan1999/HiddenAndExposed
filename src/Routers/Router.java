@@ -36,6 +36,7 @@ public class Router {
     public void printState() {
         System.out.println("所在端口： " + port);
         System.out.println("所在位置： " + location);
+        System.out.println("状态编号： " + state);
         if (isBusy()) {
             System.out.println("繁忙状态： " + "繁忙    (持续至" + sdf.format(lastBusyDate) + ")");
         } else {

@@ -1,6 +1,7 @@
 package Routers;
 
 import Messages.*;
+import com.sun.org.apache.bcel.internal.generic.BREAKPOINT;
 import worker.*;
 
 import java.text.SimpleDateFormat;
@@ -8,12 +9,15 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.InputMismatchException;
 import java.util.Scanner;
+import java.util.concurrent.*;
 
 public class Main {
     public static int[] DEFAULT_PORT = new int[]{8081, 8082, 8083, 8084};
     public static int[] DEFAULT_LOC = new int[]{0, 3, 6, 9};
     public static Date[] DEFAULT_DATE = new Date[]{new Date(), new Date(), new Date(), new Date()};
     public static int[] DEFAULT_RANGE = new int[]{5, 5, 5, 5};
+    public static boolean RTS_OPEN = false;    //RTS功能是否开启
+    public static boolean RANDOM_OPEN = false;    //是否允许随机发送状态
 
     public static Router localRouter;
     public static ArrayList<Router> routers = new ArrayList<>();  //其他路由器的信息表
@@ -41,25 +45,49 @@ public class Main {
                         target = scan.nextInt();
                         text = scan.next();
                         time = scan.nextLong();
-                        sendNormal(target, text, time);
+                        if (RTS_OPEN) {
+                            sendWithRTS(target, text, time);
+                        } else {
+                            sendNormal(target, text, time);
+                        }
                         break;
                     case "sendRandom":
                         //指定端口，间隔随机时间发送一次数据
-                        //sendRandom 8081 abc 2000 2 5
+                        //sendRandom 8081 abc 2000 2000 5000
                         target = scan.nextInt();
                         text = scan.next();
                         time = scan.nextLong();
                         min = scan.nextInt();
                         max = scan.nextInt();
-                        sendRandom(target, text, time, min, max);
-                        continueInput = false;
+                        RANDOM_OPEN = true;
+                        //另开线程去执行发送循环
+                        new Thread(() -> {
+                            if (RTS_OPEN) {
+                                sendWithRTSRandom(target, text, time, min, max);
+                            } else {
+                                sendRandom(target, text, time, min, max);
+                            }
+                        }).start();
+                        break;
+                    case "stop":
+                        if (localRouter.state >= 2) {
+                            localRouter.state = 0;
+                        }
+                        RANDOM_OPEN = false;
                         break;
                     case "state":
                         //打印当前路由器的信息
                         localRouter.printState();
                         break;
-                    case "betterSend":
-                        //TODO: 用 cts/rts 帧来减少隐蔽站和暴露站的问题
+                    case "RTS":
+                        if (RTS_OPEN) {
+                            RTS_OPEN = false;
+                            System.out.println("关闭RTS");
+                        } else {
+                            RTS_OPEN = true;
+                            System.out.println("开启RTS");
+                        }
+                        break;
                     default:
                         System.out.println("非法指令，请重新输入！");
                         break;
@@ -81,11 +109,11 @@ public class Main {
         SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss");
         if (Main.localRouter.isBusy()) {
             String nowTime = sdf.format(new Date());
-            System.out.println(nowTime + " | 检测到信道正忙，不发送消息");
+            System.out.println(nowTime + " | 信道正忙，不发送消息");
             //检测一下目标真实信道状态
             String realState = clint.send(new ProbeMsg(Main.localRouter.port, target, MsgType.PROBE, text), target);
             if (realState.equals("0")) {
-                System.out.println(nowTime + " | " + target + " 实际上并没有繁忙，发生隐蔽站问题");
+                System.out.println(nowTime + " | " + target + " 实际上并没有繁忙，发生暴露站问题");
                 Main.localRouter.state = 3;
             }
             return false;
@@ -100,15 +128,88 @@ public class Main {
         }
     }
 
-    public static void sendRandom(int target, String text, long busyTimeMillis, int min, int max) {
-        while(sendNormal(target, text, busyTimeMillis)) {
+    /***
+     * RTS发送：先发RTS预约信道，预约成功再发信息
+     * @param target    目标端口
+     * @param text    发送文本
+     * @param busyTimeMillis    占用信道持续时间
+     * @return    是否发送成功
+     */
+    public static boolean sendWithRTS(int target, String text, long busyTimeMillis) {
+        int timeout = 500;
+        SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss");
+        RTSMsg rtsMsg = new RTSMsg(Main.localRouter.port, target, MsgType.RTS, text, timeout);
+        Future<String> echoFuture = sendRTS(rtsMsg, target);
+        try {
+            String echoWord = echoFuture.get(timeout, TimeUnit.MILLISECONDS);   //在规定时间内接收消息
+            if (echoWord.equals("CTS")) {
+                //如果收到回复 CTS ，则发送接下来的信息
+                NormalMsg normalMsg = new NormalMsg(Main.localRouter.port, target, MsgType.NORMAL, text, busyTimeMillis);
+                clint.send(normalMsg, target);
+                return true;
+            } else {
+                return false;
+            }
+        } catch(Exception e) {
+            //超出时间，表明信道预约失败
+            String nowTime = sdf.format(new Date());
+            System.out.println(nowTime + " | [" + Main.localRouter.port + "] RTS预约失败：服务端无回复");
+            clint.close();
+            return false;
+        }
+    }
+
+    public static void sendWithRTSRandom(int target, String text, long busyTimeMillis, int min, int max) {
+        int timeout = 500;
+        SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss");
+        RTSMsg rtsMsg = new RTSMsg(Main.localRouter.port, target, MsgType.RTS, text, timeout);
+        while (RANDOM_OPEN) {
             double random = Math.random() * (max - min) + min;  //min~max秒的随机发送间隔
             try {
-                Thread.sleep(Math.round(random) * 1000);
+                Thread.sleep(Math.round(random));
+            } catch(Exception e) {
+                e.printStackTrace();
+            }
+
+            Future<String> echoFuture = sendRTS(rtsMsg, target);    //发一个RTS
+            try {
+                String echoWord = echoFuture.get(timeout, TimeUnit.MILLISECONDS);   //在规定时间内接收消息
+                if (echoWord.equals("CTS")) {
+                    //如果收到回复 CTS ，则发送接下来的信息
+                    NormalMsg normalMsg = new NormalMsg(Main.localRouter.port, target, MsgType.NORMAL, text, busyTimeMillis);
+                    clint.send(normalMsg, target);
+                } else {
+                    continue;
+                }
+            } catch(Exception e) {
+                //超出时间，表明信道预约失败
+                String nowTime = sdf.format(new Date());
+                System.out.println(nowTime + " | [" + Main.localRouter.port + "] RTS预约失败：服务端无回复");
+                clint.close();  //手动关闭一下clint
+                continue;
+            }
+        }
+        System.out.println("随机发送结束");
+    }
+
+    public static Future<String> sendRTS(Message msg, int target) {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        return executor.submit(() -> {
+            return clint.send(msg, target);
+        });
+    }
+
+    public static void sendRandom(int target, String text, long busyTimeMillis, int min, int max) {
+        while(RANDOM_OPEN) {
+            sendNormal(target, text, busyTimeMillis);
+            double random = Math.random() * (max - min) + min;  //min~max秒的随机发送间隔
+            try {
+                Thread.sleep(Math.round(random));
             } catch(Exception e) {
                 e.printStackTrace();
             }
         }
+        System.out.println("随机发送结束");
     }
 
     public static void configureRouter(String[] args) {
