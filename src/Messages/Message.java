@@ -26,7 +26,7 @@ public abstract class Message {
 
     /***
      * 解析 String 变为 Message
-     * @param str 字符串，格式如 fromPort&toPort&type&text&time[&lastBusyTime]
+     * @param str 字符串，格式如 fromPort&toPort&type&text[&lastBusyDate]
      * @return msg 解析的 Message
      */
     public static Message parse(String str) {

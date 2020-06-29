@@ -19,7 +19,7 @@ public class Main {
     public static boolean RANDOM_OPEN = false;    //是否允许随机发送状态
 
     public static Station localStation;
-    public static ArrayList<Station> stations = new ArrayList<>();  //其他路由器的信息表
+    public static ArrayList<Station> stations = new ArrayList<>();  //其他站点的信息表
     public static Server server;
     public static Clint clint;
 
@@ -28,7 +28,7 @@ public class Main {
             System.out.println("无效参数！");
             return;
         }
-        configureRouter(args);
+        configureStation(args);
         //输入指令
         boolean continueInput = true;
         while (continueInput) {
@@ -39,7 +39,7 @@ public class Main {
             try {
                 switch (instruction) {
                     case "send":
-                        //指定接收端口，会对所有范围内的路由器广播
+                        //指定接收端口，会对所有范围内的站点广播
                         //send 8081 abc 5000
                         target = scan.nextInt();
                         text = scan.next();
@@ -75,7 +75,7 @@ public class Main {
                         RANDOM_OPEN = false;
                         break;
                     case "state":
-                        //打印当前路由器的信息
+                        //打印当前站点的信息
                         localStation.printState();
                         break;
                     case "RTS":
@@ -119,7 +119,7 @@ public class Main {
         } else {
             for (Station station : Main.stations) {
                 if (Math.abs(station.location - Main.localStation.location) > Main.localStation.range) {
-                    continue;   //如果所选的路由器在广播范围外，则不对他发送
+                    continue;   //如果所选的站点在广播范围外，则不对他发送
                 }
                 clint.send(new NormalMsg(Main.localStation.port, target, MsgType.NORMAL, text, busyTimeMillis), station.port);
             }
@@ -211,7 +211,7 @@ public class Main {
         System.out.println("随机发送结束");
     }
 
-    public static void configureRouter(String[] args) {
+    public static void configureStation(String[] args) {
         Station a = new Station(DEFAULT_PORT[0], DEFAULT_LOC[0], DEFAULT_DATE[0], DEFAULT_RANGE[0]);
         Station b = new Station(DEFAULT_PORT[1], DEFAULT_LOC[1], DEFAULT_DATE[1], DEFAULT_RANGE[1]);
         Station c = new Station(DEFAULT_PORT[2], DEFAULT_LOC[2], DEFAULT_DATE[2], DEFAULT_RANGE[2]);

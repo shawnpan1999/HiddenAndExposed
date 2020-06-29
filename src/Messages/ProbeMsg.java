@@ -1,7 +1,7 @@
 package Messages;
 
 /***
- * 探查消息：接收端会发回当前路由器的端口、繁忙时间等消息
+ * 探查消息：接收端会发回当前站点的端口、繁忙时间等消息
  */
 public class ProbeMsg extends Message{
     public MsgType type = MsgType.PROBE;

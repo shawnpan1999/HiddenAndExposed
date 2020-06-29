@@ -48,7 +48,7 @@ public class ServerHandler implements Runnable {
                                 System.out.println("【发生隐蔽站问题】");
                                 //回应ERROR
                                 String echoWord = "ERROR";
-                                //设置路由器状态
+                                //设置站点状态
                                 Main.localStation.state = 2;
                                 dataOutputStream.writeBytes(echoWord + System.getProperty("line.separator"));
                                 quitFlag = true;
